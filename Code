@@ -1,0 +1,114 @@
+import time
+import numpy as np
+from datetime import datetime, timedelta
+
+class MultiSensorProcessor:
+    def __init__(self, update_interval=5):
+        """
+        Multi-sensor data processor for synchronizing and feeding data to a radar signal processing unit.
+        :param update_interval: Interval (in seconds) to send synchronized data to the radar processing unit.
+        """
+        self.update_interval = update_interval
+        self.sensors_data = {}  # Stores sensor data as {sensor_id: [(timestamp, value), ...]}
+        self.last_process_time = None  # Tracks the last time data was processed
+        self.system_active = False  # Tracks if the radar and distribution systems are active
+
+    def activate_system(self):
+        """
+        Activates the radar and sensor processing system.
+        """
+        self.system_active = True
+        print("System activated: Radar and sensor processing started.")
+
+    def deactivate_system(self):
+        """
+        Deactivates the radar and sensor processing system.
+        """
+        self.system_active = False
+        print("System deactivated: Radar and sensor processing stopped.")
+
+    def add_sensor_data(self, sensor_id, value):
+        """
+        Adds incoming sensor data with a timestamp.
+        :param sensor_id: Identifier for the sensor
+        :param value: The value from the sensor
+        """
+        if not self.system_active:
+            print("System is not active. Data discarded.")
+            return
+
+        timestamp = datetime.now()
+        if sensor_id not in self.sensors_data:
+            self.sensors_data[sensor_id] = []
+        self.sensors_data[sensor_id].append((timestamp, value))
+
+    def process_data(self):
+        """
+        Processes and synchronizes the sensor data for the radar processing unit.
+        :return: Dictionary of aligned sensor data {sensor_id: [(timestamp, value), ...]}
+        """
+        if not self.system_active:
+            print("System is not active. No data processing performed.")
+            return None
+
+        now = datetime.now()
+        if self.last_process_time is None:
+            self.last_process_time = now
+
+        # Check if the interval has elapsed
+        if (now - self.last_process_time).total_seconds() < self.update_interval:
+            return None
+
+        # Align data for the processing window
+        aligned_data = {}
+        for sensor_id, data in self.sensors_data.items():
+            aligned_data[sensor_id] = self._align_to_window(data)
+
+        self.last_process_time = now
+        return aligned_data
+
+    def _align_to_window(self, data):
+        """
+        Aligns sensor data to the current processing window.
+        :param data: List of sensor data [(timestamp, value), ...]
+        :return: Aligned data [(timestamp, value), ...]
+        """
+        now = datetime.now()
+        window_start = now - timedelta(seconds=self.update_interval)
+
+        # Filter data within the current processing window
+        windowed_data = [d for d in data if d[0] >= window_start]
+        
+        if not windowed_data:
+            # If no new data is available, use the last known value
+            return [data[-1]] if data else [(None, None)]
+
+        return windowed_data
+
+# Example usage for an engineering-level implementation
+if __name__ == "__main__":
+    processor = MultiSensorProcessor(update_interval=5)
+
+    # Simulate activating the system (e.g., radar and ship distribution system)
+    processor.activate_system()
+
+    # Simulated asynchronous sensor data input
+    processor.add_sensor_data("sensor_1", 10)
+    time.sleep(1)
+    processor.add_sensor_data("sensor_2", 20)
+    time.sleep(2)
+    processor.add_sensor_data("sensor_1", 12)
+    processor.add_sensor_data("sensor_2", 22)
+
+    # Continuous processing and feeding to radar
+    try:
+        while True:
+            aligned_data = processor.process_data()
+            if aligned_data:
+                print("Synchronized Data for Radar Processing:")
+                for sensor_id, data in aligned_data.items():
+                    print(f"{sensor_id}: {data}")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        # Simulate deactivating the system
+        processor.deactivate_system()
